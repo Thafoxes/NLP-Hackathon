@@ -37,7 +37,7 @@ messages=[
     {
         "role": "user",
         "content": "Please greet the driver as the car starts."
-    }
+    },
     ]
 
 # 🟢 Assistant starts the conversation
@@ -49,6 +49,46 @@ print(f"🤖 Assistant: {greeting}")
 messages.append({"role": "assistant", "content": greeting})
 
 while True:
+    #functions conversation
+    functions = [
+        {
+            "name": "make_call",
+            "description": "Make a phone call to a contact",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_name": {
+                        "type": "string",
+                        "description": "The name of the contact to call"
+                    }
+                },
+                "required": ["contact_name"]
+            }
+        },
+        {
+            "name": "get_navigation_route",
+            "description": "Get directions to a destination",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "description": "The destination to navigate to"
+                    }
+                },
+                "required": ["destination"]
+            }
+        },
+        {
+            "role": "assistant",
+            "content": "Sure! Let me call the passenger now!",
+            "function_call": {
+                "name": "make_call",
+                "arguments": "{\"contact_name\": \"Passenger\"}"
+            }
+        }
+    ]
+
     user_input = input("👤 You: ")
     if user_input.lower() in ["exit", "quit"]:
         print("👋 Goodbye!")
@@ -59,36 +99,8 @@ while True:
 
     # Generate response
     response = llm.create_chat_completion(messages=messages,
-                                          functions=[
-                                              {
-                                                  "name": "make_call",
-                                                  "description": "Make a phone call to a contact",
-                                                  "parameters": {
-                                                      "type": "object",
-                                                      "properties": {
-                                                          "contact_name": {
-                                                              "type": "string",
-                                                              "description": "The name of the contact to call"
-                                                          }
-                                                      },
-                                                      "required": ["contact_name"]
-                                                  }
-                                              },
-                                              {
-                                                  "name": "get_navigation_route",
-                                                  "description": "Get directions to a destination",
-                                                  "parameters": {
-                                                      "type": "object",
-                                                      "properties": {
-                                                          "destination": {
-                                                              "type": "string",
-                                                              "description": "The destination to navigate to"
-                                                          }
-                                                      },
-                                                      "required": ["destination"]
-                                                  }
-                                              }
-                                          ]
+                                          functions=functions,
+                                          function_call="auto"
                                           )
 
     # Get assistant reply
