@@ -1,61 +1,227 @@
+# -*- coding: utf-8 -*-
 import os
+from open_ai import call_customer, navigate_destination, extract_destination, validate_travel_location
+import json
 
-from huggingface_hub import hf_hub_download
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+os.environ["LLAMA_CPP_LOG_LEVEL"] = "ERROR"
+from llama_cpp import Llama
+
+from main import *
+from constants import *
+
+
 import torch
+
+#fixed setting
+language = default_language.value
+pending_navigation_confirmation  = False
+pending_destination = None
+
 
 # Choose device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Hugging Face API key and model
-HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
-
-huggingface_model = 'malaysia-ai/Malaysian-Llama-3.2-3B-Instruct'
-
-# Required model files
-required_files = [
-    "special_tokens_map.json",
-    "generation_config.json",
-    "tokenizer_config.json",
-    "model.safetensors",
-    "eval_results.json",
-    "tokenizer.model",
-    "tokenizer.json",
-    "config.json"
-]
-
-# Download model files
-print("🔄 Downloading model files...")
-for filename in required_files:
-    download_location = hf_hub_download(
-        repo_id=huggingface_model,
-        filename=filename,
-        token=HUGGING_FACE_API_KEY
-    )
-    print(f"✅ Downloaded: {filename}")
-
-# Load model and tokenizer
-print("🚀 Loading model and tokenizer...")
-model = AutoModelForCausalLM.from_pretrained(huggingface_model, trust_remote_code=True).to(device)
-tokenizer = AutoTokenizer.from_pretrained(huggingface_model)
-
-# Create text generation pipeline
-text_generation_pipeline = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
+llm = Llama.from_pretrained(
+    repo_id="mradermacher/Llama-3.2-3B-Malaysian-Reasoning-GGUF",
+    filename="Llama-3.2-3B-Malaysian-Reasoning.IQ4_XS.gguf",
     device=0 if device == "cuda" else -1,
-    max_length=1000
+    chat_format="chatml",  # Make sure it's chat-based!
+    verbose=True,            # Optional, to see loading logs
+    n_ctx=2048               # Set context length
 )
 
-# Prompt user for input
+
+#convo history
+messages=[
+
+    {
+        "role": "assistant",
+        "content": (
+            "You are a voice-based assistant for Malaysian drivers. "
+            "You give directions, call contacts, and respond clearly and briefly. "
+            "Always return a JSON object for commands. "
+            f"You speak in this language which is {language}"
+        )
+    },
+    {
+        "role": "user",
+        "content": f"Please greet the driver casually as you are summoned. Speak in {language}"
+    },
+    ]
+
+# 🟢 Assistant starts the conversation
+initial_response = llm.create_chat_completion(messages=messages)
+greeting = initial_response["choices"][0]["message"]["content"]
+print(f"🤖 Assistant: {greeting}")
+
+# Add assistant greeting to message history
+messages.append({"role": "assistant", "content": greeting})
+
+
+def translate_text(text, target_language=language):
+    translation_prompt = f"Translate this sentence to {target_language}: {text}"
+
+    # Create temporary message history just for translation
+    translation_messages = [
+        {
+            "role": "system",
+            "content": f"You are a multilingual assistant that can fluently translate text to {target_language} and return ONLY the translated text with no explanation or extra characters:\n\n{text}"
+        },
+        {
+            "role": "user",
+            "content": translation_prompt
+        }
+    ]
+
+    # Call your LLaMA model
+    result = llm.create_chat_completion(messages=translation_messages)
+    translated = result["choices"][0]["message"]["content"]
+
+    return translated
+
+
+def llama_chat_reply():
+    global response
+    # Add user message to history
+    messages.append({"role": "user", "content": f"{user_input}."})
+    # Generate response
+    response = llm.create_chat_completion(messages=messages,
+                                          functions=functions,
+                                          function_call="auto"
+                                          )
+    # Get assistant reply
+    reply = response["choices"][0]["message"]["content"]
+    print(f"🤖 Bot: {reply}")
+    # Add assistant response to history for continuation
+    messages.append({"role": "assistant", "content": reply})
+
+
 while True:
-    user_input = input("\n📝 Enter any message (or type 'exit' to quit): ")
-    if user_input.lower() == 'exit':
+    #functions conversation
+    functions = [
+        {
+            "name": "make_call",
+            "description": "Make a phone call to a contact",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_name": {
+                        "type": "string",
+                        "description": "The name of the contact to call"
+                    }
+                },
+                "required": ["contact_name"]
+            }
+        },
+        {
+            "name": "get_navigation_route",
+            "description": "Get directions to a destination",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "description": "The destination to navigate to"
+                    }
+                },
+                "required": ["destination"]
+            }
+        },
+        {
+            "role": "assistant",
+            "content": "Sure! Let me call the passenger now!",
+            "function_call": {
+                "name": "make_call",
+                "arguments": "{\"contact_name\": \"Passenger\"}"
+            }
+        }
+    ]
+
+    user_input = input("👤 You: ")
+    if user_input.lower() in quitting_keywords:
         print("👋 Goodbye!")
         break
+    # call AI command trigger
+    if any(keyword in user_input.lower() for keyword in call_keywords) and on_order:
+        print(translate_text("Processing....")) #translate this hard coded chat to LLM translated feedback
+        openAI_response = call_customer()
+        response_to_json = json.loads(openAI_response.arguments)
+        print(response_to_json)
+        print(response_to_json["voip_id"])
 
-    response = text_generation_pipeline(user_input)
-    print(response)
-    print("\n🤖 Response:")
-    print(response[0]['generated_text'])
+    elif any(keyword in user_input.lower() for keyword in call_keywords) and not on_order:
+        print(translate_text("⚠️ You’re not currently on an order. Calling is disabled."))
+
+    # --- 📍 Navigation Trigger ---
+    elif any(keyword in user_input.lower() for keyword in navigate_keywords):
+
+        #open AI to extract the destination
+        response = extract_destination(user_input).arguments
+        json_file = json.loads(response)
+        print(json_file)
+        destination = json_file["destination"]
+        # OpenAI to validate travel destination
+        destination = validate_travel_location(destination)
+        print(translate_text(f"I think you meant:  {destination}"))
+
+
+        pending_navigation_confirmation = True
+        pending_destination = destination
+        messages.append({"role": "user", "content": f"Navigate to {destination}"})
+        confirm_prompt = f"Are you sure you want to go to {destination}?"
+        messages.append({"role": "assistant", "content": confirm_prompt})
+        print(translate_text(f"🤖 Bot: {confirm_prompt}"))
+
+        # ------- Pending Confirmation Received ---
+    elif pending_navigation_confirmation:
+        # User confirmed to go
+        if any(keyword in user_input.lower() for keyword in confirmation_keywords) and pending_navigation_confirmation:
+            # ✅ navigation user wants to go
+            print(translate_text("🔧 Confirmed. Generating navigation command..."))
+            response = navigate_destination(pending_destination).arguments
+            response = json.loads(response)
+            print(response["destination"])
+
+            pending_destination = None
+            pending_navigation_confirmation = False
+            user_input = (
+                f"I've set your navigation to {response['destination']}. "
+                f"Now, please restart the conversation in {language} and ask how you can assist."
+            )
+            llama_chat_reply()
+            continue
+        elif user_input.lower() in rejection_keywords and pending_navigation_confirmation:
+            #🔴 if user says no, cancel the navigation enquiry
+            print(translate_text("Cancelling the message..."))
+            pending_navigation_confirmation = False
+
+            #restart the whole conversation
+            user_input = "Restart the whole conversation."
+            llama_chat_reply()
+
+        else:
+            # like no, i want to go Subang not KLCC
+            # 🟡 If NOT a simple confirmation, treat user_input as a NEW destination
+            print(translate_text("🔄 Updating destination based on your message..."))
+            response = extract_destination(pending_destination.lower()).arguments
+            json_file = json.loads(response)
+            destination = json_file["destination"]
+
+            # Validate again
+            destination = validate_travel_location(destination)
+
+            # Set pending confirmation again
+            pending_destination = destination
+            pending_navigation_confirmation = True
+            messages.append({"role": "user", "content": f"Navigate to {destination}"})
+            confirm_prompt = f"Are you sure you want to go to {destination}?"
+            messages.append({"role": "assistant", "content": confirm_prompt})
+            #replying back
+            user_input = confirm_prompt
+            continue
+    else:
+
+
+        llama_chat_reply()
+
+
