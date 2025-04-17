@@ -13,7 +13,7 @@ from constants import *
 import torch
 
 #fixed setting
-Language = default_language
+language = default_language.value
 pending_navigation_confirmation  = False
 pending_destination = None
 
@@ -40,12 +40,12 @@ messages=[
             "You are a voice-based assistant for Malaysian drivers. "
             "You give directions, call contacts, and respond clearly and briefly. "
             "Always return a JSON object for commands. "
-            f"You speak in this language which is {Language}"
+            f"You speak in this language which is {language}"
         )
     },
     {
         "role": "user",
-        "content": f"Please greet the driver casually as you are summoned. Speak in {Language}"
+        "content": f"Please greet the driver casually as you are summoned. Speak in {language}"
     },
     ]
 
@@ -56,6 +56,28 @@ print(f"🤖 Assistant: {greeting}")
 
 # Add assistant greeting to message history
 messages.append({"role": "assistant", "content": greeting})
+
+
+def translate_text(text, target_language=language):
+    translation_prompt = f"Translate this sentence to {target_language}: {text}"
+
+    # Create temporary message history just for translation
+    translation_messages = [
+        {
+            "role": "system",
+            "content": f"You are a multilingual assistant that can fluently translate text to {target_language} and return ONLY the translated text with no explanation or extra characters:\n\n{text}"
+        },
+        {
+            "role": "user",
+            "content": translation_prompt
+        }
+    ]
+
+    # Call your LLaMA model
+    result = llm.create_chat_completion(messages=translation_messages)
+    translated = result["choices"][0]["message"]["content"]
+
+    return translated
 
 
 def llama_chat_reply():
@@ -116,30 +138,31 @@ while True:
     ]
 
     user_input = input("👤 You: ")
-    if user_input.lower() in ["exit", "quit"]:
+    if user_input.lower() in quitting_keywords:
         print("👋 Goodbye!")
         break
     # call AI command trigger
     if any(keyword in user_input.lower() for keyword in call_keywords) and on_order:
-        print("🔧 Processing....")
+        print(translate_text("Processing....")) #translate this hard coded chat to LLM translated feedback
         openAI_response = call_customer()
         response_to_json = json.loads(openAI_response.arguments)
         print(response_to_json)
         print(response_to_json["voip_id"])
 
     elif any(keyword in user_input.lower() for keyword in call_keywords) and not on_order:
-        print("⚠️ You’re not currently on an order. Calling is disabled.")
+        print(translate_text("⚠️ You’re not currently on an order. Calling is disabled."))
 
     # --- 📍 Navigation Trigger ---
     elif any(keyword in user_input.lower() for keyword in navigate_keywords):
 
         #open AI to extract the destination
-        json_file = extract_destination(user_input).arguments
-        json_file = json.loads(json_file)
+        response = extract_destination(user_input).arguments
+        json_file = json.loads(response)
         print(json_file)
         destination = json_file["destination"]
-        # OpenAI check travel destination valid or not
+        # OpenAI to validate travel destination
         destination = validate_travel_location(destination)
+        print(translate_text(f"I think you meant:  {destination}"))
 
 
         pending_navigation_confirmation = True
@@ -147,22 +170,29 @@ while True:
         messages.append({"role": "user", "content": f"Navigate to {destination}"})
         confirm_prompt = f"Are you sure you want to go to {destination}?"
         messages.append({"role": "assistant", "content": confirm_prompt})
-        print(f"🤖 Bot: {confirm_prompt}")
+        print(translate_text(f"🤖 Bot: {confirm_prompt}"))
 
-        # ---, Pending Confirmation Received ---
+        # ------- Pending Confirmation Received ---
     elif pending_navigation_confirmation:
         # User confirmed to go
-        if user_input.lower() in confirmation_keywords:
+        if any(keyword in user_input.lower() for keyword in confirmation_keywords) and pending_navigation_confirmation:
+            # ✅ navigation user wants to go
             print("🔧 Confirmed. Generating navigation command...")
             response = navigate_destination(pending_destination).arguments
-            print(response)
             response = json.loads(response)
             print(response["destination"])
 
             pending_destination = None
             pending_navigation_confirmation = False
+            user_input = (
+                f"I've set your navigation to {response['destination']}. "
+                f"Now, please restart the conversation in {language} and ask how you can assist."
+            )
+            llama_chat_reply()
+            continue
         elif user_input.lower() in rejection_keywords and pending_navigation_confirmation:
-            print("Cancelling the message...")
+            #🔴 if user says no, cancel the navigation enquiry
+            print(translate_text("Cancelling the message..."))
             pending_navigation_confirmation = False
 
             #restart the whole conversation
@@ -170,11 +200,11 @@ while True:
             llama_chat_reply()
 
         else:
+            # like no, i want to go Subang not KLCC
             # 🟡 If NOT a simple confirmation, treat user_input as a NEW destination
-            print("🔄 Updating destination based on your message...")
-            print(user_input)
-            json_file = extract_destination(user_input.lower()).arguments
-            json_file = json.loads(json_file)
+            print(translate_text("🔄 Updating destination based on your message..."))
+            response = extract_destination(pending_destination.lower()).arguments
+            json_file = json.loads(response)
             destination = json_file["destination"]
 
             # Validate again
@@ -193,4 +223,5 @@ while True:
 
 
         llama_chat_reply()
+
 

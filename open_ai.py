@@ -58,8 +58,8 @@ def print_output(completion):
     function_name = tool_call.function.name
     arguments_json = tool_call.function.arguments
     # print("Function name:", function_name)
-    # print("Arguments:", arguments_json)
-    # print("Json: " , tool_call)
+    # print("Arguments:", tool_call)
+    print("Json: " , tool_call.function)
     return tool_call.function
 
 
@@ -140,7 +140,7 @@ def navigate_destination(pending_destination):
                                 "description": "Avoid highways"
                             }
                         },
-                         "required": ["destination"]
+                         "required": ["destination", "avoid_tolls", "avoid_highways"]
                     }
                 }
             }
@@ -173,5 +173,4 @@ def validate_travel_location(user_input):
     )
 
     corrected_location = completion.choices[0].message.content
-    print("I think you meant: ", corrected_location)
     return corrected_location
