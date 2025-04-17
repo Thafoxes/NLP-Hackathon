@@ -9,7 +9,7 @@ from io import BytesIO
 API_KEY = os.getenv('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY')
 
 g = geocoder.ip('me')
-print(f"Current location: {g.latlng}")
+# print(f"Current location: {g.latlng}")
 
 
 lat, lng = g.latlng[0], g.latlng[1] # Replace with actual lat/lng
