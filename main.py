@@ -12,7 +12,7 @@ class Language(Enum):
 on_order = True
 is_calling = False
 is_on_mic = False
-default_language = Language.ENGLISH
+default_language = Language.MALAY
 
 
 

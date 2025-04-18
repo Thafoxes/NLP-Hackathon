@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
+
+from DeepToVosk.TTS_SpeakText import speak_text
 from open_ai import call_customer, navigate_destination, extract_destination, validate_travel_location
 import json
 
@@ -31,41 +33,18 @@ llm = Llama.from_pretrained(
 )
 
 
-#convo history
-messages=[
-
-    {
-        "role": "assistant",
-        "content": (
-            "You are a voice-based assistant for Malaysian drivers. "
-            "You give directions, call contacts, and respond clearly and briefly. "
-            "Always return a JSON object for commands. "
-            f"You speak in this language which is {language}"
-        )
-    },
-    {
-        "role": "user",
-        "content": f"Please greet the driver casually as you are summoned. Speak in {language}"
-    },
-    ]
-
-# 🟢 Assistant starts the conversation
-initial_response = llm.create_chat_completion(messages=messages)
-greeting = initial_response["choices"][0]["message"]["content"]
-print(f"🤖 Assistant: {greeting}")
-
-# Add assistant greeting to message history
-messages.append({"role": "assistant", "content": greeting})
-
-
-def translate_text(text, target_language=language):
+def translate_text_TTS(text, target_language=language):
     translation_prompt = f"Translate this sentence to {target_language}: {text}"
 
     # Create temporary message history just for translation
     translation_messages = [
         {
             "role": "system",
-            "content": f"You are a multilingual assistant that can fluently translate text to {target_language} and return ONLY the translated text with no explanation or extra characters:\n\n{text}"
+            "content": f"You are a multilingual assistant that can fluently translate text to {target_language} "
+                       f"and return ONLY the translated text with NO explanation or EXTRA characters:\n\n{text}"
+                       f"If the sentence is already in the target language {target_language}, return it exactly as-is. "
+                       "Otherwise, translate it to Malay. Do NOT explain anything. "
+                       "Return ONLY the translated or original sentence, no quotes, no comments."
         },
         {
             "role": "user",
@@ -76,8 +55,37 @@ def translate_text(text, target_language=language):
     # Call your LLaMA model
     result = llm.create_chat_completion(messages=translation_messages)
     translated = result["choices"][0]["message"]["content"]
-
+    speak_text(translated)
     return translated
+
+#convo history
+messages=[
+
+    {
+        "role": "system",
+        "content": (
+            "You are a voice-based assistant for Malaysian drivers. "
+            "You give directions, call contacts, and respond clearly and short. "
+            # "Always return a JSON object for commands. "
+            f"You speak in this language {language}"
+            "Strictly speak in short and simple way no explanation"
+            "ONLY return the translated sentence as-is, without quotes or notes. "
+        )
+    },
+    {
+        "role": "user",
+        "content": f"Please greet the driver casually as you are summoned. Speak in {language}"
+    },
+    ]
+
+# 🟢 Assistant starts the conversation
+initial_response = llm.create_chat_completion(messages=messages, function_call="auto")
+greeting = initial_response["choices"][0]["message"]["content"]
+print(translate_text_TTS(f"🤖 Assistant: {greeting}"))
+
+# Add assistant greeting to message history
+messages.append({"role": "assistant", "content": greeting})
+
 
 
 def llama_chat_reply():
@@ -91,6 +99,8 @@ def llama_chat_reply():
                                           )
     # Get assistant reply
     reply = response["choices"][0]["message"]["content"]
+    #text to voice TTS Speak text
+    speak_text(reply)
     print(f"🤖 Bot: {reply}")
     # Add assistant response to history for continuation
     messages.append({"role": "assistant", "content": reply})
@@ -139,18 +149,19 @@ while True:
 
     user_input = input("👤 You: ")
     if user_input.lower() in quitting_keywords:
+        speak_text("Goodbye!")
         print("👋 Goodbye!")
         break
     # call AI command trigger
     if any(keyword in user_input.lower() for keyword in call_keywords) and on_order:
-        print(translate_text("Processing....")) #translate this hard coded chat to LLM translated feedback
+        print(translate_text_TTS("Processing")) #translate this hard coded chat to LLM translated feedback
         openAI_response = call_customer()
         response_to_json = json.loads(openAI_response.arguments)
         print(response_to_json)
         print(response_to_json["voip_id"])
 
     elif any(keyword in user_input.lower() for keyword in call_keywords) and not on_order:
-        print(translate_text("⚠️ You’re not currently on an order. Calling is disabled."))
+        print(translate_text_TTS("You’re not currently on an order. Calling is disabled."))
 
     # --- 📍 Navigation Trigger ---
     elif any(keyword in user_input.lower() for keyword in navigate_keywords):
@@ -162,7 +173,7 @@ while True:
         destination = json_file["destination"]
         # OpenAI to validate travel destination
         destination = validate_travel_location(destination)
-        print(translate_text(f"I think you meant:  {destination}"))
+        print(translate_text_TTS(f"I think you meant:  {destination}"))
 
 
         pending_navigation_confirmation = True
@@ -170,14 +181,14 @@ while True:
         messages.append({"role": "user", "content": f"Navigate to {destination}"})
         confirm_prompt = f"Are you sure you want to go to {destination}?"
         messages.append({"role": "assistant", "content": confirm_prompt})
-        print(translate_text(f"🤖 Bot: {confirm_prompt}"))
+        print("🤖 Bot:"+translate_text_TTS(f" {confirm_prompt}"))
 
         # ------- Pending Confirmation Received ---
     elif pending_navigation_confirmation:
         # User confirmed to go
         if any(keyword in user_input.lower() for keyword in confirmation_keywords) and pending_navigation_confirmation:
             # ✅ navigation user wants to go
-            print(translate_text("🔧 Confirmed. Generating navigation command..."))
+            print(translate_text_TTS("Confirmed. Generating navigation command"))
             response = navigate_destination(pending_destination).arguments
             response = json.loads(response)
             print(response["destination"])
@@ -192,7 +203,7 @@ while True:
             continue
         elif user_input.lower() in rejection_keywords and pending_navigation_confirmation:
             #🔴 if user says no, cancel the navigation enquiry
-            print(translate_text("Cancelling the message..."))
+            print(translate_text_TTS("Cancelling the message"))
             pending_navigation_confirmation = False
 
             #restart the whole conversation
@@ -202,7 +213,7 @@ while True:
         else:
             # like no, i want to go Subang not KLCC
             # 🟡 If NOT a simple confirmation, treat user_input as a NEW destination
-            print(translate_text("🔄 Updating destination based on your message..."))
+            print(translate_text_TTS("Updating destination based on your message"))
             response = extract_destination(pending_destination.lower()).arguments
             json_file = json.loads(response)
             destination = json_file["destination"]

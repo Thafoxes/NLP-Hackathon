@@ -18,3 +18,5 @@ rejection_keywords = [# Malay / Bahasa Melayu
     "不是", "不要", "没有", "取消", "等一下", "暂停", "停止", "不是那边", "不是那个地方"]
 
 quitting_keywords = ["exit", "quit", "bye", "see you", "thank you", "terima kasih"]
+
+languages_TTS = ["en-US-JennyNeural","ms-MY-YasminNeural", "zh-CN-XiaoxiaoNeural"]
