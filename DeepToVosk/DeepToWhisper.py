@@ -101,8 +101,8 @@ def transcribe_vosk(wav_path="enhanced_output.wav"):
     if os.path.exists(wav_path):
         # print(f"file found! The language is {vosk_language}")
         model = whisper.load_model("large")  # Available model: tiny, base, small, medium, large
-        # result = model.transcribe(wav_path, language=en)  # en = english, ms = malaysia, zh = chinese
         result = model.transcribe(wav_path)  # en = english, ms = malaysia, zh = chinese
+        # result = model.transcribe(wav_path)  # en = english, ms = malaysia, zh = chinese
         print(result["text"])
         return result["text"]
     else:

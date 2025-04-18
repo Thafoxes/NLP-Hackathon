@@ -1,11 +1,16 @@
 import asyncio
+
 import websockets
+
 
 # This is the function that handles each client connection
 async def handler(websocket, path):
     print("🔌 Client connected")
 
     try:
+        # Initial message from server to client
+        await websocket.send("📡 Hello from the server!")
+
         async for message in websocket:
             print(f"📥 Received: {message}")
             response = f"Echo: {message}"
