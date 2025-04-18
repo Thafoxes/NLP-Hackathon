@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
 
+
+# from DeepToVosk import TTS_SpeakText, DeepToWhisper
 from DeepToVosk.TTS_SpeakText import speak_text
+from DeepToVosk.DeepToWhisper import receiveAudio
 from open_ai import call_customer, navigate_destination, extract_destination, validate_travel_location
 import json
 
@@ -147,8 +150,9 @@ while True:
         }
     ]
 
-    user_input = input("👤 You: ")
-    if user_input.lower() in quitting_keywords:
+    user_input = receiveAudio()
+    print(user_input)
+    if any(keyword in user_input.lower() for keyword  in quitting_keywords):
         speak_text("Goodbye!")
         print("👋 Goodbye!")
         break
@@ -181,6 +185,7 @@ while True:
         messages.append({"role": "user", "content": f"Navigate to {destination}"})
         confirm_prompt = f"Are you sure you want to go to {destination}?"
         messages.append({"role": "assistant", "content": confirm_prompt})
+        print(confirm_prompt)
         print("🤖 Bot:"+translate_text_TTS(f" {confirm_prompt}"))
 
         # ------- Pending Confirmation Received ---
@@ -188,7 +193,7 @@ while True:
         # User confirmed to go
         if any(keyword in user_input.lower() for keyword in confirmation_keywords) and pending_navigation_confirmation:
             # ✅ navigation user wants to go
-            print(translate_text_TTS("Confirmed. Generating navigation command"))
+            print(translate_text_TTS("Confirmed"))
             response = navigate_destination(pending_destination).arguments
             response = json.loads(response)
             print(response["destination"])

@@ -1,28 +1,31 @@
+import os
+
 import sounddevice as sd
 import numpy as np
 import torch
 import time
 from df.enhance import enhance, init_df, save_audio
-import json
-from vosk import KaldiRecognizer, Model
 import wave
+import whisper
 
-from TTS_SpeakText import speak_text
+
+from main import  vosk_language
 
 # Initialize DeepFilterNet
 model, df_state, _ = init_df()
 sr = df_state.sr()
 frame_duration = 0.03  # 30ms
 frame_length = int(sr * frame_duration)
-silence_threshold = 0.01
-silence_timeout = 2.0  # wait time after last speech to stop
+silence_threshold = 0.05
+silence_timeout = 0.5  # wait time after last speech to stop
 
-print("🤖 Nava is waiting for your order...")
+
+# print("🤖 Nava is waiting for your order...")
 
 def rms_energy(audio):
     return np.sqrt(np.mean(audio ** 2))
 
-def main():
+def receiveAudio():
     speaking = False
     has_spoken = False
     last_speech_time = None
@@ -32,7 +35,7 @@ def main():
     speech_start_threshold = 5  # Number of strong frames before recording
     started_recording = False
 
-    start_threshold = 0.03  # Stricter threshold to start (adjust as needed)
+    start_threshold = 0.01  # Stricter threshold to start (adjust as needed)
     stop_threshold = 0.015
 
     def callback(indata, frames, time_info, status):
@@ -85,27 +88,26 @@ def main():
 
     if buffer:
         full_audio = np.concatenate(buffer)
+        save_audio("output.wav", full_audio, sr)
+        # print("✅ Done! Saved as output.wav")
+
         tensor_audio = torch.tensor(full_audio).unsqueeze(0)
         enhanced = enhance(model, df_state, tensor_audio)
-        save_audio("../enhanced_output.wav", full_audio, sr) #bypass the enhanced issue
-        print("✅ Done! Saved as enhanced_output.wav")
+        save_audio("enhanced_output.wav", enhanced, sr)
+        # print("✅ Done! Saved as enhanced_output.wav")
+        return transcribe_vosk()
 
-def transcribe_vosk(wav_path="../enhanced_output.wav"):
-    wf = wave.open(wav_path, "rb")
-    model_vosk = Model(r"vosk-model-small-en-us-0.15/vosk-model-small-en-us-0.15")
-    recognizer = KaldiRecognizer(model_vosk, wf.getframerate())
+def transcribe_vosk(wav_path="enhanced_output.wav"):
+    if os.path.exists(wav_path):
+        # print(f"file found! The language is {vosk_language}")
+        model = whisper.load_model("large")  # Available model: tiny, base, small, medium, large
+        # result = model.transcribe(wav_path, language=en)  # en = english, ms = malaysia, zh = chinese
+        result = model.transcribe(wav_path)  # en = english, ms = malaysia, zh = chinese
+        print(result["text"])
+        return result["text"]
+    else:
+        print("file not found!")
+        return "Sorry I can't get what you meant."
 
-    text = ""
-    while True:
-        data = wf.readframes(4000)
-        if len(data) == 0:
-            break
-        if recognizer.AcceptWaveform(data):
-            result = json.loads(recognizer.Result())
-            text += result.get("text", "") + " "
-    wf.close()
-    print(f"📝 You : {text.strip()}")
-    return text.strip()
-
-main()
-speak_text(transcribe_vosk())
+# main()
+# transcribe_vosk()
