@@ -8,6 +8,10 @@ from websockets.exceptions import ConnectionClosed
 AUDIO_DIR = "received_audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
+async def send_ping(websocket):
+    await websocket.send("ping")
+
+
 async def handle_client(websocket):
     client_ip = websocket.remote_address[0]
     print(f"[{datetime.datetime.now()}] Client connected from {client_ip}")
