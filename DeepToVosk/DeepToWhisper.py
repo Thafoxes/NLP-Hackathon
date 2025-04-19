@@ -8,7 +8,7 @@ from df.enhance import enhance, init_df, save_audio
 import wave
 import whisper
 
-from constants import enchance_sound_output, sound_output
+from constants import enchance_sound_output
 from main import  vosk_language
 
 # Initialize DeepFilterNet
@@ -88,7 +88,7 @@ def receiveAudio():
 
     if buffer:
         full_audio = np.concatenate(buffer)
-        save_audio(f"{sound_output}.wav", full_audio, sr)
+        save_audio("output.wav", full_audio, sr)
         # print("✅ Done! Saved as output.wav")
 
         tensor_audio = torch.tensor(full_audio).unsqueeze(0)
