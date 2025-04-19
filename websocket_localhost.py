@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 
 import websockets
 
@@ -134,6 +135,7 @@ async def start_websocket():
     server = await websockets.serve(ws_handler, "0.0.0.0", 3000)
     await server.wait_closed()
 
+
 @app.websocket("/connect")
 async def connection_check(websocket: WebSocket):
     await websocket.accept()
@@ -143,56 +145,86 @@ async def connection_check(websocket: WebSocket):
     # Buffer for collecting binary data
     audio_buffer = bytearray()
     expect_audio = False
+    audio_reception_start = None
 
     try:
         await websocket.send_text("📡 Hello from FastAPI WebSocket!")
 
         while True:
             try:
-                msg = await websocket.receive()
-                if "text" in msg:
-                    print(f"📥 Received text: {msg['text']}")
-                    await websocket.send_text(f"Echo: {msg['text']}")
+                # Use websocket.receive_json(), receive_text(), or receive_bytes()
+                # instead of the generic receive() to better handle different message types
+                message_type = None
 
-                    # Check if this is the audio marker
-                    if msg['text'] == "AUDIO_DATA":
-                        expect_audio = True
+                # Try to determine what kind of message we're receiving
+                try:
+                    text_data = await websocket.receive_text()
+                    message_type = "text"
+                    print(f"📥 Received text: '{text_data}'")
+
+                    # If we receive the audio marker, prepare to receive binary data
+                    if text_data == "AUDIO_DATA":
                         print("📢 Audio data marker received, expecting binary data next")
+                        expect_audio = True
                         audio_buffer = bytearray()  # Reset the buffer
+                        audio_reception_start = time.time()
+                    else:
+                        await websocket.send_text(f"Echo: {text_data}")
 
-                elif "bytes" in msg:
-                    binary_data = msg["bytes"]
-                    print(f"📥 Received binary data: {len(binary_data)} bytes")
+                except WebSocketDisconnect:
+                    raise  # Re-raise to be caught by the outer try/except
+                except RuntimeError:
+                    # If we can't receive text, try binary
+                    try:
+                        binary_data = await websocket.receive_bytes()
+                        message_type = "bytes"
 
-                    # Add to our buffer
-                    audio_buffer.extend(binary_data)
+                        if expect_audio:
+                            data_length = len(binary_data)
+                            print(f"📥 Received binary chunk: {data_length} bytes")
 
-                    # Save the audio data
-                    filename = f"{sound_output}.wav"
-                    with open(filename, 'wb') as f:
-                        f.write(binary_data)
-                    print(f"📥 Received and saved audio: {filename}")
+                            # Add to our buffer
+                            audio_buffer.extend(binary_data)
+                            print(f"Total audio buffer size now: {len(audio_buffer)} bytes")
 
-                    # Reset state
-                    expect_audio = False
+                            # Save the current buffer to file
+                            filename = f"{sound_output}.wav"
+                            with open(filename, 'wb') as f:
+                                f.write(audio_buffer)
 
-                    # Acknowledge receipt
-                    await websocket.send_text(f"✅ Audio received and saved as {filename}")
+                            # Send acknowledgment and reset state
+                            print(f"📥 Completed audio reception: {filename} ({len(audio_buffer)} bytes)")
+                            await websocket.send_text(f"✅ Audio received and saved: {len(audio_buffer)} bytes")
+                            expect_audio = False
+                        else:
+                            print(f"⚠️ Received binary data without AUDIO_DATA marker")
+                    except (WebSocketDisconnect, RuntimeError):
+                        # Client has disconnected
+                        raise WebSocketDisconnect()
 
-                    # Echo the audio back (if needed)
-                    # await websocket.send_bytes(binary_data)
+                # If we couldn't determine the message type, client might be disconnected
+                if message_type is None:
+                    print("No message received, client might be disconnected")
+                    break
+
             except WebSocketDisconnect:
+                print(f"WebSocket disconnect detected during message processing")
                 raise  # Re-raise to be caught by the outer try/except
+
             except Exception as e:
                 print(f"Error processing message: {e}")
-                await websocket.send_text(f"Error: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                # Don't break the loop for other errors
 
     except WebSocketDisconnect:
         print(f"❌ Client {client.host}:{client.port} disconnected.")
-
-@app.get("/")
-async def check_scheme(request: Request):
-    return {"scheme": request.url.scheme}
+        # Save any pending audio before disconnecting
+        if expect_audio and len(audio_buffer) > 0:
+            filename = f"{sound_output}.wav"
+            with open(filename, 'wb') as f:
+                f.write(audio_buffer)
+            print(f"📥 Saved pending audio on disconnect: {filename} ({len(audio_buffer)} bytes)")
 
 async def main():
 
