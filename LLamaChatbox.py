@@ -39,7 +39,7 @@ messages=[
         "role": "system",
         "content": (
             "You are a voice-based assistant for Malaysian drivers. "
-            "You give directions, call contacts, and respond clearly and short. "
+            "You give directions, call contacts, and respond strictly clear and short. "
             # "Always return a JSON object for commands. "
             f"You speak in this language {language}"
             "Strictly speak in short and simple way no explanation"
@@ -92,6 +92,7 @@ functions = [
         ]
 
 def translate_text_TTS(text, target_language=language):
+    return text
     translation_prompt = f"Translate this sentence to {target_language}: {text}"
 
     # Create temporary message history just for translation
@@ -153,6 +154,7 @@ def start_chat_assistant():
 
         #change change change chagne pls plsplspslslpslspsl
         user_input = receiveAudio()
+        # user_input = input()
         print(user_input)
         if any(keyword in user_input.lower() for keyword  in quitting_keywords):
             speak_text("Goodbye!")
@@ -165,6 +167,9 @@ def start_chat_assistant():
             response_to_json = json.loads(openAI_response.arguments)
             print(response_to_json)
             print(response_to_json["voip_id"])
+            user_input = "Restart the whole conversation."
+            llama_chat_reply()
+            continue
 
         elif any(keyword in user_input.lower() for keyword in call_keywords) and not on_order:
             print(translate_text_TTS("You’re not currently on an order. Calling is disabled."))
@@ -242,3 +247,5 @@ def start_chat_assistant():
 
             llama_chat_reply()
 
+
+start_chat_assistant()

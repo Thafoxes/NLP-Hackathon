@@ -16,8 +16,9 @@ model, df_state, _ = init_df()
 sr = df_state.sr()
 frame_duration = 0.03  # 30ms
 frame_length = int(sr * frame_duration)
-silence_threshold = 0.05
-silence_timeout = 0.5  # wait time after last speech to stop
+silence_threshold = 0.01
+silence_timeout = 7.0
+# wait time after last speech to stop
 
 
 # print("🤖 Nava is waiting for your order...")
@@ -35,8 +36,8 @@ def receiveAudio():
     speech_start_threshold = 5  # Number of strong frames before recording
     started_recording = False
 
-    start_threshold = 0.01  # Stricter threshold to start (adjust as needed)
-    stop_threshold = 0.015
+    start_threshold = 0.0  # Stricter threshold to start (adjust as needed)
+    stop_threshold = 0.05
 
     def callback(indata, frames, time_info, status):
         nonlocal speaking, has_spoken, last_speech_time, recording_done, buffer

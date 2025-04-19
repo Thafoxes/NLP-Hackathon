@@ -53,14 +53,23 @@ def call_customer():
 
 
 def print_output(completion):
-    # Print structured output
-    tool_call = completion.choices[0].message.tool_calls[0]
-    function_name = tool_call.function.name
-    arguments_json = tool_call.function.arguments
-    # print("Function name:", function_name)
-    # print("Arguments:", tool_call)
-    print("Json: " , tool_call.function)
-    return tool_call.function
+    try:
+        tool_calls = completion.choices[0].message.tool_calls
+        if not tool_calls:
+            print("⚠️ No tool calls returned by the model.")
+            print("Model response:", completion.choices[0].message)
+            return None  # Or raise an error if you want to handle it differently
+
+        tool_call = tool_calls[0]
+        function_name = tool_call.function.name
+        arguments_json = tool_call.function.arguments
+        print("Json:", tool_call.function)
+        return tool_call.function
+
+    except Exception as e:
+        print(f"❌ Error in print_output: {e}")
+        return None
+
 
 
 def extract_destination(user_input):
