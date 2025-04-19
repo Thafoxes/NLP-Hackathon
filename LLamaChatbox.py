@@ -113,6 +113,7 @@ def translate_text_TTS(text, target_language=language):
     result = llm.create_chat_completion(messages=translation_messages)
     translated = result["choices"][0]["message"]["content"]
     speak_text(translated)
+    # send it to the TTS_speak text
     return translated
 
 
@@ -150,6 +151,7 @@ def start_chat_assistant():
     while True:
         #functions conversation
 
+        #change change change chagne pls plsplspslslpslspsl
         user_input = receiveAudio()
         print(user_input)
         if any(keyword in user_input.lower() for keyword  in quitting_keywords):
@@ -240,5 +242,3 @@ def start_chat_assistant():
 
             llama_chat_reply()
 
-
-start_chat_assistant()

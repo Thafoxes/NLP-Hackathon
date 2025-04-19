@@ -8,7 +8,7 @@ from df.enhance import enhance, init_df, save_audio
 import wave
 import whisper
 
-
+from constants import enchance_sound_output, sound_output
 from main import  vosk_language
 
 # Initialize DeepFilterNet
@@ -88,16 +88,16 @@ def receiveAudio():
 
     if buffer:
         full_audio = np.concatenate(buffer)
-        save_audio("output.wav", full_audio, sr)
+        save_audio(f"{sound_output}.wav", full_audio, sr)
         # print("✅ Done! Saved as output.wav")
 
         tensor_audio = torch.tensor(full_audio).unsqueeze(0)
         enhanced = enhance(model, df_state, tensor_audio)
-        save_audio("enhanced_output.wav", enhanced, sr)
+        save_audio(enchance_sound_output, enhanced, sr)
         # print("✅ Done! Saved as enhanced_output.wav")
         return transcribe_vosk()
 
-def transcribe_vosk(wav_path="enhanced_output.wav"):
+def transcribe_vosk(wav_path=enchance_sound_output):
     if os.path.exists(wav_path):
         # print(f"file found! The language is {vosk_language}")
         model = whisper.load_model("large")  # Available model: tiny, base, small, medium, large

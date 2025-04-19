@@ -21,3 +21,6 @@ quitting_keywords = ["exit", "quit", "bye", "see you", "thank you", "terima kasi
 
 languages_TTS = ["en-US-JennyNeural","ms-MY-YasminNeural", "zh-CN-XiaoxiaoNeural"]
 vosk_language_STT = ["en", "ms", "cn"]
+
+enchance_sound_output = "enhanced_output.wav"
+sound_output = "output"
