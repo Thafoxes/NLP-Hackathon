@@ -87,15 +87,21 @@ def receiveAudio():
         pass
 
     if buffer:
-        full_audio = np.concatenate(buffer)
-        save_audio("output.wav", full_audio, sr)
-        # print("✅ Done! Saved as output.wav")
+        full_audio = save_original_voice_file_whisper(buffer)
 
         tensor_audio = torch.tensor(full_audio).unsqueeze(0)
         enhanced = enhance(model, df_state, tensor_audio)
         save_audio(enchance_sound_output, enhanced, sr)
         # print("✅ Done! Saved as enhanced_output.wav")
         return transcribe_vosk()
+
+
+def save_original_voice_file_whisper(buffer):
+    full_audio = np.concatenate(buffer)
+    save_audio("raw_output.wav", full_audio, sr)
+    # print("✅ Done! Saved as output.wav")
+    return full_audio
+
 
 def transcribe_vosk(wav_path=enchance_sound_output):
     if os.path.exists(wav_path):

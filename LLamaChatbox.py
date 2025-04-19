@@ -241,4 +241,3 @@ def start_chat_assistant():
 
 
             llama_chat_reply()
-
