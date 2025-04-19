@@ -62,7 +62,7 @@ def store_tts_response(audio_bytes):
 
 @app.websocket("/voice-stream")
 async def voice_stream(websocket: WebSocket):
-    print("voice_stream WebSocket server running on ws://0.0.0.0:3000")
+    print("voice_stream WebSocket server running on ws://0.0.0.0:3000/voice-stream")
     try:
         while True:
             audio_data = await tts_queue.get()  # waits until available
@@ -75,7 +75,7 @@ async def voice_stream(websocket: WebSocket):
 
 @app.websocket("/mic-stream")
 async def mic_stream(websocket: WebSocket):
-    print("mic_stream WebSocket server running on ws://0.0.0.0:3000")
+    print("mic_stream WebSocket server running on ws://0.0.0.0:3000/mic-stream")
     await websocket.accept()
     audio_buffer = bytearray()
     silence_threshold = 5  # adjust for your case
